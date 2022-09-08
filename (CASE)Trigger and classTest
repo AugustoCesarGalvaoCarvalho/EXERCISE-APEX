@@ -1,0 +1,197 @@
+
+trigger OpportunityTrigger on Opportunity (before insert, before update, after insert, after update) {
+    
+    if(Trigger.isBefore){
+        if(Trigger.isInsert){
+        }
+        if(Trigger.isUpdate){
+            OpportunityHanddler.oppUpdateStageNameClosedWon(Trigger.new); 
+            OpportunityHanddler.oppCreateTaskInOppUpdate(Trigger.new);
+        }
+    }
+    if(Trigger.isAfter){
+        if(Trigger.isInsert){  
+        }
+        if(Trigger.isUpdate){
+        }    
+    }
+}
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+public class OpportunityHanddler {
+    
+    public static void oppUpdateStageNameClosedWon(List<Opportunity> lstOppNew){ 
+
+        for(Opportunity itemOppt : lstOppNew){
+            Opportunity oppOld = (Opportunity)Trigger.oldMap.get(itemOppt.Id);
+            if(oppOld.StageName == 'Closed Won'){
+               itemOppt.Name.addError('Oportunidade fechada, procure o Admin.');
+            } 
+        }
+    } 
+    public static void oppCreateTaskInOppUpdate(List<Opportunity> listOpp){ 
+        
+        List<Task> listaTask = new List<Task>();
+        
+        for(Opportunity itemOppt : listOpp){
+            Opportunity oppOld = (Opportunity)Trigger.oldMap.get(itemOppt.Id);
+            if(oppOld.Amount >= 10000 && itemOppt.StageName == 'Renegotiation/Review' && oppOld.StageName == 'Value Proposition'){  
+                
+                Task newTask = new Task();
+                newTask.Subject = 'Análisar a oportunidade o quanto antes!';
+                newTask.WhatId = itemOppt.Id;
+                listaTask.add(newTask);
+            }
+            insert listaTask;
+        }   
+    }
+}
+
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+@isTest
+public class OpportunityHanddlerTest {
+    
+    @testSetup
+    public static void setup(){
+        Opportunity oppt = new Opportunity ();
+        oppt.Description = 'Teste';
+        oppt.StageName = 'Closed Won';
+        oppt.Name = 'João';
+        oppt.CloseDate = System.Today() + 2;
+        
+        insert oppt;
+    }
+    @isTest
+    public static void oppUpdateStageNameClosedWonTest(){
+        Opportunity oppt2 = [SELECT Id, StageName FROM Opportunity LIMIT 1];
+        
+        Test.startTest();
+        try{
+            oppt2.StageName = 'Closed Lost';
+            update oppt2;   
+            
+        }catch(Exception e){
+            System.assert(e.getMessage().contains('Oportunidade fechada, procure o Admin.'));
+        }
+        
+        Test.stopTest();     
+    }
+    @isTest
+    public static void oppCreateTaskInOppUpdateTest2(){
+        Opportunity oppt5 = new Opportunity ();
+        oppt5.Description = 'Teste';
+        oppt5.StageName = 'Value Proposition';
+        oppt5.Name = 'João';
+        oppt5.CloseDate = System.Today() + 2;
+        oppt5.Amount = 10000;
+        
+        insert oppt5;
+        
+        Test.startTest();
+        try{
+            oppt5.StageName = 'Renegotiation/Review';
+            update oppt5;
+            
+        }catch(Exception e){
+            // System.assert(e.getMessage().contains('Oportunidade fechada, procure o Admin.'));
+            //System.assert(oppt5.StageName.contains('Renegotiation/Review'));
+        }   
+        Test.stopTest();
+    }       
+}
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+trigger AccountTrigger on Account (after insert, after update, before insert, before update){
+    
+    if(Trigger.isBefore){
+        if(Trigger.isInsert){
+            AccountHanddler.accAtualizaOppt(Trigger.new);
+        }
+        if(Trigger.isUpdate){
+        }
+    }
+    if(Trigger.isUpdate){
+        if(Trigger.isInsert){   
+        }
+        if(Trigger.isUpdate){    
+        }    
+    }
+}   
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+
+public class AccountHanddler {
+    
+    public static void accAtualizaOppt (List<Account> lstAcc){
+        
+        List<Opportunity> listaOpportunity = new List<Opportunity>();
+        
+        for(Account itemAcc: lstAcc){
+            if(itemAcc.Rating == 'Hot' && itemAcc.CustomerPriority__c == 'High' && itemAcc.PacoteCurso__c == 'InvestSupreme') {       
+                
+                Opportunity newOpportunity = new Opportunity();
+                
+                newOpportunity.Name = 'proposta de pacote para ' + itemAcc.Name; 
+                newOpportunity.CloseDate = system.today().addDays(3); // ou + 3;
+                newOpportunity.Amount = 0.0;
+                newOpportunity.AccountId = itemAcc.Id;
+                newOpportunity.StageName = 'Prospecting';
+                listaOpportunity.add(newOpportunity);
+            }
+        }
+        insert listaOpportunity;   
+    }
+}
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+
+@isTest
+public class AccountHanddlerTest {
+    
+    @testSetup
+    public static void setup(){
+        Account acc = new Account ();
+        acc.Name = 'Augusto Carvalho';
+        acc.Rating = 'Hot';
+        acc.CustomerPriority__c = 'High';
+        acc.PacoteCurso__c = 'InvestSupreme';
+        
+        insert acc;
+    }
+    @isTest
+    public static void accAtualizaOppt(){
+        Account acc2 = [SELECT Id, Name FROM Account LIMIT 1];
+        
+        Test.startTest();
+        try{
+            Opportunity opp = new Opportunity();
+            opp.Name = 'proposta de pacote para ' + acc2.Name; 
+            opp.CloseDate = system.today().addDays(3); // ou + 3;
+            opp.Amount = 0.0;
+            opp.AccountId = acc2.Id;
+            opp.StageName = 'Prospecting';
+            
+            update acc2;
+
+        }catch(Exception e){
+          //  System.assert(e.getMessage().contains('Oportunidade fechada, procure o Admin.'));     
+        }
+        Test.stopTest();
+    }
+}
